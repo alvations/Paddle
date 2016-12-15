@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,13 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #pragma once
 #ifndef PADDLE_USE_GFLAGS
-#include "DisableCopy.h"
+#include <stdint.h>
 #include <string>
 #include <vector>
-#include <stdint.h>
+#include "DisableCopy.h"
 
 namespace paddle {
 
@@ -72,7 +71,8 @@ struct CommandLineFlagRegister {
    * \param [inout] val: The command line argument instance, FLAGS_xxx.
    * \param [in] desc: The command line helper message.
    */
-  CommandLineFlagRegister(const std::string& name, T* val,
+  CommandLineFlagRegister(const std::string& name,
+                          T* val,
                           const std::string desc) {
     CommandLineFlagRegistry<T>::Instance()->commands.push_back(
         {name, val, desc, *val});
@@ -83,7 +83,8 @@ struct CommandLineFlagRegister {
  * \brief: Define a command line arguments.
  *
  * \param type: The variable type, such as int, double, etc.
- * \param name: The variable name. The command line argument is '--name', the variable
+ * \param name: The variable name. The command line argument is '--name', the
+ *variable
  *is 'FLAGS_name'
  * \param default_value: The default value of command line argument.
  * \param text: The description in command line argument.

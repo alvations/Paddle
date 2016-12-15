@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,9 +12,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "CudnnConvLayer.h"
 #include "paddle/utils/Logging.h"
 #include "paddle/utils/Stat.h"
-#include "CudnnConvLayer.h"
 
 namespace paddle {
 
@@ -32,16 +32,16 @@ bool CudnnConvLayer::init(const LayerMap &layerMap,
   numFilters_ = config_.num_filters();
   CHECK(config_.shared_biases());
   for (size_t i = 0; i < inputLayers_.size(); i++) {
-    ProjectionConfig* conf = new ProjectionConfig();
+    ProjectionConfig *conf = new ProjectionConfig();
     conf->set_type("conv");
     conf->set_num_filters(numFilters_);
-    ConvConfig* convConf = conf->mutable_conv_conf();
+    ConvConfig *convConf = conf->mutable_conv_conf();
     *convConf = *(config_.mutable_inputs(i)->mutable_conv_conf());
     conf->set_input_size(getPrev(i)->getSize());
     conf->set_output_size(getSize());
     projConf_.emplace_back(conf);
-    projections_.emplace_back(Projection::create(*projConf_[i],
-                                                 parameters_[i], useGpu_));
+    projections_.emplace_back(
+        Projection::create(*projConf_[i], parameters_[i], useGpu_));
   }
 
   if (biases_.get() && sharedBiases_) {
@@ -67,15 +67,21 @@ void CudnnConvLayer::forward(PassType passType) {
   if (biases_) {
     REGISTER_TIMER_INFO("CudnnConvBiasTimer", getName().c_str());
     int batchSize = inputLayers_[0]->getOutputValue()->getHeight();
-    hl_tensor_reshape(outputDesc_, batchSize, numFilters_ / groups_[0],
-        outputH_[0], outputW_[0], numFilters_ * outputH_[0] * outputW_[0],
-        outputH_[0] * outputW_[0], outputW_[0], 1);
+    hl_tensor_reshape(outputDesc_,
+                      batchSize,
+                      numFilters_ / groups_[0],
+                      outputH_[0],
+                      outputW_[0],
+                      numFilters_ * outputH_[0] * outputW_[0],
+                      outputH_[0] * outputW_[0],
+                      outputW_[0],
+                      1);
     outputOffset_ = getOutputValue()->getWidth() / groups_[0];
     for (int g = 0; g < groups_[0]; ++g) {
       real *biasData = biases_->getW()->getData() + biasOffset_ * g;
       real *outData = getOutputValue()->getData() + outputOffset_ * g;
-      hl_convolution_forward_add_bias(biasDesc_, biasData,
-                                      outputDesc_, outData);
+      hl_convolution_forward_add_bias(
+          biasDesc_, biasData, outputDesc_, outData);
     }
   }
 

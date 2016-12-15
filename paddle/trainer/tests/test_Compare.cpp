@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@ limitations under the License. */
 
 #include "paddle/trainer/Trainer.h"
 
-#include <cstdlib>
 #include <gtest/gtest.h>
+#include <cstdlib>
 
 using namespace paddle;  // NOLINT
 using namespace std;     // NOLINT
@@ -52,8 +52,8 @@ void calcGradient(bool useGpu, comData& Data) {
   vector<Argument>& inArgs = dataBatch.getStreams();
   trainer.getGradientMachine()->start(trainer.getConfig(), nullptr);
   for (int i = 0; i < 2; ++i) {
-    trainer.getGradientMachine()->forwardBackward(inArgs, &Data.outArgs,
-                                                  PASS_TRAIN);
+    trainer.getGradientMachine()->forwardBackward(
+        inArgs, &Data.outArgs, PASS_TRAIN);
   }
   trainer.getGradientMachine()->finish();
 }

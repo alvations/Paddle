@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,10 @@ limitations under the License. */
 
 #pragma once
 
-#include "paddle/math/Matrix.h"
-#include "SequenceToBatch.h"
 #include "GruCompute.h"
 #include "Layer.h"
+#include "SequenceToBatch.h"
+#include "paddle/math/Matrix.h"
 
 namespace paddle {
 
@@ -63,13 +63,19 @@ public:
   LayerStatePtr getState();
 
 protected:
-  void forwardSequence(int batchSize, size_t numSequences,
-                       const int *starts, MatrixPtr inputValue);
-  void backwardSequence(int batchSize, size_t numSequences,
-                        const int *starts, MatrixPtr inputGrad);
+  void forwardSequence(int batchSize,
+                       size_t numSequences,
+                       const int* starts,
+                       MatrixPtr inputValue);
+  void backwardSequence(int batchSize,
+                        size_t numSequences,
+                        const int* starts,
+                        MatrixPtr inputGrad);
 
-  void forwardBatch(int batchSize, size_t numSequences,
-                    const int *starts, MatrixPtr inputValue);
+  void forwardBatch(int batchSize,
+                    size_t numSequences,
+                    const int* starts,
+                    MatrixPtr inputValue);
   void backwardBatch(int batchSize, MatrixPtr inputGrad);
 
 protected:

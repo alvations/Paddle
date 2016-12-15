@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "paddle/utils/Logging.h"
 #include "SequencePoolLayer.h"
+#include "paddle/utils/Logging.h"
 
 namespace paddle {
 
@@ -58,7 +58,7 @@ void SequencePoolLayer::forward(PassType passType) {
   resetOutput(newBatchSize_, dim);
   if (type_) {
     CHECK(input.subSequenceStartPositions)
-      << "when trans_type = seq, input must hasSubseq";
+        << "when trans_type = seq, input must hasSubseq";
   }
   /* If type_ = kNonSeq, both seq has or not has sub-seq degrade to a non-seq,
    * thus, in this case, output_ has no sequenceStartPositions.

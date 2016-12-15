@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,20 +12,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #pragma once
 
-#include "paddle/utils/Util.h"
 #include "paddle/parameter/AverageOptimizer.h"
 #include "paddle/parameter/FirstOrderOptimizer.h"
 #include "paddle/parameter/OptimizerFunctions.h"
 #include "paddle/parameter/OptimizerWithRegularizer.h"
 #include "paddle/parameter/Parameter.h"
 #include "paddle/parameter/Regularizer.h"
+#include "paddle/utils/Util.h"
 
 #include <memory>
 #include <vector>
-
 
 namespace paddle {
 
@@ -45,13 +43,11 @@ public:
   explicit SgdThreadUpdater(const OptimizationConfig& optConfig);
   virtual ~SgdThreadUpdater() {}
 
-
   // Use the startPass() function of the base optimizer.
   virtual void startPass();
 
   // Use the finishPass() function of the base optimizer.
   virtual bool finishPass(real cost);
-
 
   virtual void init(std::vector<ParameterPtr>& parameters);
   virtual PassType startBatch(int64_t batchSize);
@@ -78,9 +74,11 @@ protected:
   void threadUpdateDense(int tid, size_t numThreads, Parameter* para);
   // The update function for after update operations, such as averager.
   void threadTraverse(const ParameterOptimizer::TraverseCallback& callback,
-                      int tid, size_t numThreads, Parameter* para);
+                      int tid,
+                      size_t numThreads,
+                      Parameter* para);
   typedef std::function<const ParameterOptimizer::TraverseCallback(Parameter*)>
-    GetTraverseCallback;
+      GetTraverseCallback;
   void traverse(GetTraverseCallback getTraverseCallback);
 };
 

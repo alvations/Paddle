@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@ limitations under the License. */
 #pragma once
 
 #include "Layer.h"
-#include "paddle/math/Matrix.h"
-#include "paddle/math/BaseMatrix.h"
-#include "SequenceToBatch.h"
 #include "LstmCompute.h"
+#include "SequenceToBatch.h"
+#include "paddle/math/BaseMatrix.h"
+#include "paddle/math/Matrix.h"
 namespace paddle {
 
 /**
@@ -97,12 +97,16 @@ protected:
    * @param starts Each start position of each samples.
    * @param inputValue The input values.
    */
-  void forwardSequence(int batchSize, size_t numSequences, const int *starts,
+  void forwardSequence(int batchSize,
+                       size_t numSequences,
+                       const int *starts,
                        MatrixPtr inputValue);
   /**
    * Compute lstm backward one sequence by one sequence.
    */
-  void backwardSequence(int batchSize, size_t numSequences, const int *starts,
+  void backwardSequence(int batchSize,
+                        size_t numSequences,
+                        const int *starts,
                         MatrixPtr inputGrad);
 
   /**
@@ -121,12 +125,16 @@ protected:
    * }
    * @endcode
    */
-  void forwardBatch(int batchSize, size_t numSequences, const int *starts,
+  void forwardBatch(int batchSize,
+                    size_t numSequences,
+                    const int *starts,
                     MatrixPtr inputValue);
   /**
    * Compute lstm backward one batch by one batch.
    */
-  void backwardBatch(int batchSize, size_t numSequences, const int *starts,
+  void backwardBatch(int batchSize,
+                     size_t numSequences,
+                     const int *starts,
                      MatrixPtr inputGrad);
 
   /**
@@ -134,13 +142,17 @@ protected:
    * batch value. It will launch one kernel to parallelly compute forward
    * propagation in sequence level.
    */
-  void forwardSeqParallel(int batchSize, size_t numSequences, const int *starts,
+  void forwardSeqParallel(int batchSize,
+                          size_t numSequences,
+                          const int *starts,
                           MatrixPtr inputValue);
   /**
    * Backward propagation corresponding to forwardSeqParallel.
    */
-  void backwardSeqParallel(int batchSize, size_t numSequences,
-                           const int *starts, MatrixPtr inputGrad);
+  void backwardSeqParallel(int batchSize,
+                           size_t numSequences,
+                           const int *starts,
+                           MatrixPtr inputGrad);
   /**
    * This function is used for sequence generation and get output after
    * forwardBatch.

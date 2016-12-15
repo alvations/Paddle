@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@ limitations under the License. */
 #ifndef PADDLE_USE_GFLAGS
 //! Test Command Line Parser for paddle internal implement.
 
-#include <paddle/utils/CommandLineParser.h>
 #include <gtest/gtest.h>
+#include <paddle/utils/CommandLineParser.h>
 
 P_DEFINE_int32(i1, 1, "test int flag 1");
 P_DEFINE_int32(i2, 2, "test int flag 2");
@@ -63,10 +63,15 @@ TEST(CommandLineParser, defaultValue) {
 }
 
 TEST(CommandLineParser, normal) {
-  char* argv[] = {
-      cc("test_program"), cc("--i2=32"),              cc("--str1=abc"),
-      cc("--b2=1"),       cc("-b1=False"),            cc("--d2=.34"),
-      cc("--d1=0"),       cc("--l1=-12345678901234"), cc("-ul2=3212")};
+  char* argv[] = {cc("test_program"),
+                  cc("--i2=32"),
+                  cc("--str1=abc"),
+                  cc("--b2=1"),
+                  cc("-b1=False"),
+                  cc("--d2=.34"),
+                  cc("--d1=0"),
+                  cc("--l1=-12345678901234"),
+                  cc("-ul2=3212")};
   int argc = sizeof(argv) / sizeof(char*);
   paddle::ParseCommandLineFlags(&argc, argv);
   ASSERT_EQ(argc, 1);
@@ -104,9 +109,6 @@ int main(int argc, char** argv) {
 
 #else
 
-int main(int argc, char** argv) {
-  return 0;
-}
+int main(int argc, char** argv) { return 0; }
 
 #endif
-

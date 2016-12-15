@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,24 +12,24 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #include "GradientMachine.h"
 
-#include "paddle/utils/Logging.h"
 #include <fstream>
+#include "paddle/utils/Logging.h"
 
-#include "hl_gpu.h"
+#include "GradientMachineMode.h"
+#include "MultiGradientMachine.h"
+#include "MultiNetwork.h"
+#include "NeuralNetwork.h"
 #include "NeuralNetwork.h"
 #include "ParallelNeuralNetwork.h"
-#include "MultiGradientMachine.h"
-#include "NeuralNetwork.h"
-#include "MultiNetwork.h"
-#include "GradientMachineMode.h"
+#include "hl_gpu.h"
 
 namespace paddle {
 
 GradientMachine* GradientMachine::create(
-    const ModelConfig& config, int mode,
+    const ModelConfig& config,
+    int mode,
     const std::vector<ParameterType>& parameterTypes) {
   if (auto gm = IGradientMachineMode::tryCreateGradientMachine(mode, config)) {
     return gm;
@@ -49,10 +49,11 @@ GradientMachine* GradientMachine::create(
       /* single thread calculate */
       nn = NeuralNetwork::create(config);
     }
-    ParamInitCallback testParamInitCb =
-        [](int paramId, Parameter* para) { para->enableType(PARAMETER_VALUE); };
-    nn->init(config, mode == kTesting ? testParamInitCb : nullptr,
-             parameterTypes);
+    ParamInitCallback testParamInitCb = [](int paramId, Parameter* para) {
+      para->enableType(PARAMETER_VALUE);
+    };
+    nn->init(
+        config, mode == kTesting ? testParamInitCb : nullptr, parameterTypes);
     return nn;
   }
   LOG(FATAL) << "Unknown model type: " << config.type();

@@ -1,4 +1,4 @@
-# Copyright (c) 2016 Baidu, Inc. All Rights Reserved
+# Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +65,7 @@ __all__ = [
     'StaticInput',
     'expand_layer',
     'scaling_layer',
+    'scaling_projection',
     'power_layer',
     'interpolation_layer',
     'bilinear_interp_layer',
@@ -90,6 +91,7 @@ __all__ = [
     'linear_comb_layer',
     'convex_comb_layer',
     'ctc_layer',
+    'warp_ctc_layer',
     'crf_layer',
     'crf_decoding_layer',
     'nce_layer',
@@ -128,6 +130,9 @@ class LayerType(object):
     HSIGMOID = 'hsigmoid'
     CONV_LAYER = "conv"
     CONVTRANS_LAYER = "convt"
+    EXCONV_LAYER = "exconv"
+    EXCONVTRANS_LAYER = "exconvt"
+    CUDNNCONV_LAYER = "cudnn_conv"
     POOL_LAYER = "pool"
     BATCH_NORM_LAYER = 'batch_norm'
     NORM_LAYER = 'norm'
@@ -168,6 +173,7 @@ class LayerType(object):
     PRINT_LAYER = "print"
 
     CTC_LAYER = "ctc"
+    WARP_CTC_LAYER = "warp_ctc"
     CRF_LAYER = "crf"
     CRF_DECODING_LAYER = "crf_decoding"
     NCE_LAYER = 'nce'
@@ -458,7 +464,7 @@ def identity_projection(input, offset=None):
     :type input: LayerOutput
     :param offset: Offset, None if use default.
     :type offset: int
-    :return: A IdentityProjection or IdentityOffsetProjection Object
+    :return: A IdentityProjection or IdentityOffsetProjection object
     :rtype: IdentityProjection or IdentityOffsetProjection
     """
     if offset is None:
@@ -468,6 +474,33 @@ def identity_projection(input, offset=None):
         proj = IdentityOffsetProjection(
             input_layer_name=input.name, offset=offset)
         proj.origin = input
+    return proj
+
+
+@wrap_param_attr_default()
+def scaling_projection(input, param_attr=None):
+    """
+    scaling_projection multiplies the input with a scalar parameter and add to
+    the output.
+
+    .. math::
+       out += w * in
+
+    The example usage is:
+
+    .. code-block:: python
+
+       proj = scaling_projection(input=layer)
+
+    :param input: Input Layer.
+    :type input: LayerOutput
+    :param param_attr: Parameter config, None if use default.
+    :type param_attr: ParameterAttribute
+    :return: A ScalingProjection object
+    :rtype: ScalingProjection
+    """
+    proj = ScalingProjection(input_layer_name=input.name, **param_attr.attr)
+    proj.origin = input
     return proj
 
 
@@ -735,7 +768,7 @@ def mixed_layer(size=0,
 
 
 @layer_support()
-def data_layer(name, size, layer_attr=None):
+def data_layer(name, size, height=None, width=None, layer_attr=None):
     """
     Define DataLayer For NeuralNetwork.
 
@@ -750,6 +783,10 @@ def data_layer(name, size, layer_attr=None):
     :type name: basestring
     :param size: Size of this data layer.
     :type size: int
+    :param height: Height of this data layer, used for image
+    :type size: int|None
+    :param width: Width of this data layer, used for image
+    :type size: int|None
     :param layer_attr: Extra Layer Attribute.
     :type layer_attr: ExtraLayerAttribute.
     :return: LayerOutput object.
@@ -759,6 +796,8 @@ def data_layer(name, size, layer_attr=None):
         type=LayerType.DATA,
         name=name,
         size=size,
+        height=height,
+        width=width,
         **ExtraLayerAttribute.to_kwargs(layer_attr))
 
     return LayerOutput(name, LayerType.DATA, size=size)
@@ -1426,11 +1465,11 @@ def bilinear_interp_layer(input,
     .. code-block:: python
 
        bilinear = bilinear_interp_layer(input=layer1, out_size_x=64, out_size_y=64)
-    
+
     :param   input:        A input layer.
     :type    input:        LayerOutput.
     :param   out_size_x:   bilinear interpolation output width.
-    :type    out_size_x:   int|None 
+    :type    out_size_x:   int|None
     :param   out_size_y:   bilinear interpolation output height.
     :type    out_size_y:   int|None
     :param   name:         The layer's name, which cna not be specified.
@@ -1452,7 +1491,7 @@ def bilinear_interp_layer(input,
             bilinear_interp=BilinearInterp(
                 out_size_x=out_size_x,
                 out_size_y=out_size_y,
-                num_channels=num_channels)),
+                channels=num_channels)),
         type=LayerType.BILINEAR_INTERP_LAYER,
         **ExtraLayerAttribute.to_kwargs(layer_attr))
     return LayerOutput(
@@ -1734,7 +1773,8 @@ def img_conv_layer(input,
                    filter_size_y=None,
                    stride_y=None,
                    padding_y=None,
-                   trans=False):
+                   trans=False,
+                   layer_type=None):
     """
     Convolution layer for image. Paddle only support square input currently and
     thus input image's width equals height.
@@ -1742,11 +1782,11 @@ def img_conv_layer(input,
     The details of convolution layer, please refer UFLDL's `convolution
     <http://ufldl.stanford.edu/tutorial/supervised/
     FeatureExtractionUsingConvolution/>`_ .
-    
-    Convolution Transpose (deconv) layer for image. Paddle only support square 
+
+    Convolution Transpose (deconv) layer for image. Paddle only support square
     input currently and thus input image's width equals height.
 
-    The details of convolution transpose layer, 
+    The details of convolution transpose layer,
     please refer to the following explanation and references therein
     <http://datascience.stackexchange.com/questions/6107/
     what-are-deconvolutional-layers/>`_ .
@@ -1801,6 +1841,10 @@ def img_conv_layer(input,
     :type layer_attr: ExtraLayerAttribute
     :param trans: true if it is a convTransLayer, false if it is a convLayer
     :type trans: bool
+    :param layer_type: specify the layer_type, default is None. If trans=True,
+                       layer_type has to be "exconvt", otherwise layer_type 
+                       has to be either "exconv" or "cudnn_conv"
+    :type layer_type: String
     :return: LayerOutput object.
     :rtype: LayerOutput
     """
@@ -1837,7 +1881,14 @@ def img_conv_layer(input,
         param_attr.attr["initial_strategy"] = 0
         param_attr.attr["initial_smart"] = False
 
-    lt = LayerType.CONVTRANS_LAYER if trans else LayerType.CONV_LAYER
+    if layer_type:
+        if trans:
+            assert layer_type in ["exconvt"]
+        else:
+            assert layer_type in ["exconv", "cudnn_conv"]
+        lt = layer_type
+    else:
+        lt = LayerType.CONVTRANS_LAYER if trans else LayerType.CONV_LAYER
 
     l = Layer(
         name=name,
@@ -1880,8 +1931,7 @@ def img_pool_layer(input,
                    layer_attr=None,
                    pool_size_y=None,
                    stride_y=None,
-                   padding_y=None,
-                   img_width=None):
+                   padding_y=None):
     """
     Image pooling Layer.
 
@@ -1912,9 +1962,6 @@ def img_pool_layer(input,
     :type stride_y: int|None
     :param layer_attr: Extra Layer attribute.
     :type layer_attr: ExtraLayerAttribute
-    :param img_width: the width of input feature map. If it is None, the input feature
-                      map should be square.
-    :type img_width: int|None
     :return: LayerOutput object.
     :rtype: LayerOutput
     """
@@ -1950,8 +1997,7 @@ def img_pool_layer(input,
                     padding=padding,
                     size_y=pool_size_y,
                     stride_y=stride_y,
-                    padding_y=padding_y,
-                    img_width=img_width))
+                    padding_y=padding_y))
         ],
         **ExtraLayerAttribute.to_kwargs(layer_attr))
     return LayerOutput(
@@ -1969,7 +2015,6 @@ def spp_layer(input,
               num_channels=None,
               pool_type=None,
               pyramid_height=None,
-              img_width=None,
               layer_attr=None):
     """
     Spatial Pyramid Pooling in Deep Convolutional Networks for Visual Recognition.
@@ -1986,9 +2031,6 @@ def spp_layer(input,
     :type scale: BasePoolingType
     :param pyramid_height: pyramid height.
     :type pyramid_height: int
-    :param img_width: the width of input feature map. If it is None, the input feature
-                      map should be square.
-    :type img_width: int|None
     :param layer_attr: Extra Layer Attribute.
     :type layer_attr: ExtraLayerAttribute
     :return: LayerOutput object.
@@ -2015,8 +2057,7 @@ def spp_layer(input,
             spp=SpatialPyramidPool(
                 pool_type=type_name,
                 channels=num_channels,
-                pyramid_height=pyramid_height,
-                img_width=img_width)),
+                pyramid_height=pyramid_height)),
         **ExtraLayerAttribute.to_kwargs(layer_attr))
     return LayerOutput(
         name,
@@ -2754,7 +2795,12 @@ class SubsequenceInput(object):
 
 
 @wrap_name_default("recurrent_group")
-def recurrent_group(step, input, reverse=False, name=None, targetInlink=None):
+def recurrent_group(step,
+                    input,
+                    reverse=False,
+                    name=None,
+                    targetInlink=None,
+                    is_generating=False):
     """
     Recurrent layer group is an extremely flexible recurrent unit in
     PaddlePaddle. As long as the user defines the calculation done within a
@@ -2819,6 +2865,12 @@ def recurrent_group(step, input, reverse=False, name=None, targetInlink=None):
 
     :type targetInlink: LayerOutput|SubsequenceInput
 
+    :param is_generating: If is generating, none of input type should be LayerOutput;
+                          else, for training or testing, one of the input type must
+                          be LayerOutput.
+
+    : type is_generating: bool
+
     :return: LayerOutput object.
     :rtype: LayerOutput
     """
@@ -2866,12 +2918,15 @@ def recurrent_group(step, input, reverse=False, name=None, targetInlink=None):
         seq_reversed=reverse,
         target_inlinkname=targetInlinkName)
     in_args = []
+    has_LayerOutput = False
     for each_input in input:
         assert is_single_input(each_input)
         if isinstance(each_input, LayerOutput):
             in_args.append(each_input)
+            has_LayerOutput = True
         elif isinstance(each_input, SubsequenceInput):
             in_args.append(each_input.input)
+            has_LayerOutput = True
         else:
             mem_name = "__%s_memory__" % each_input.input.name
             mem = memory(
@@ -2885,6 +2940,8 @@ def recurrent_group(step, input, reverse=False, name=None, targetInlink=None):
                     act=IdentityActivation()) as mix:
                 mix += identity_projection(mem)
             in_args.append(mem)
+
+    assert (is_generating != has_LayerOutput)
 
     layer_outs = step(*in_args)
 
@@ -3177,7 +3234,11 @@ def beam_search(step,
         return predict
 
     tmp = recurrent_group(
-        step=__real_step__, input=real_input, reverse=False, name=name)
+        step=__real_step__,
+        input=real_input,
+        reverse=False,
+        name=name,
+        is_generating=True)
 
     return tmp
 
@@ -3760,6 +3821,7 @@ def linear_comb_layer(weights, vectors, size=None, name=None, layer_attr=None):
     .. math::
 
        z(i) = \sum_{j=0}^{M-1} x(j) y(i+Nj)
+
     where :math:`0 \le i \le N-1`
 
     Or in the matrix notation:
@@ -4034,6 +4096,83 @@ def ctc_layer(input,
         inputs=[input.name, label.name],
         **ExtraLayerAttribute.to_kwargs(layer_attr))
     return LayerOutput(name, LayerType.CTC_LAYER, [input, label], size=size)
+
+
+@wrap_name_default()
+@layer_support()
+def warp_ctc_layer(input,
+                   label,
+                   size=None,
+                   name=None,
+                   blank=0,
+                   norm_by_times=False,
+                   layer_attr=None):
+    """
+    A layer intergrating the open-source `warp-ctc
+    <https://github.com/baidu-research/warp-ctc>` library, which is used in
+    `Deep Speech 2: End-toEnd Speech Recognition in English and Mandarin
+    <https://arxiv.org/pdf/1512.02595v1.pdf>`, to compute Connectionist Temporal
+    Classification (CTC) loss.
+
+    More details of CTC can be found by referring to `Connectionist Temporal
+    Classification: Labelling Unsegmented Sequence Data with Recurrent
+    Neural Networks <http://machinelearning.wustl.edu/mlpapers/paper_files/
+    icml2006_GravesFGS06.pdf>`_
+
+    Note:
+        - Let num_classes represent the category number. Considering the 'blank'
+          label needed by CTC, you need to use (num_classes + 1) as the input
+          size. Thus, the size of both warp_ctc_layer and 'input' layer should
+          be set to num_classes + 1.
+        - You can set 'blank' to any value ranged in [0, num_classes], which
+          should be consistent as that used in your labels.
+        - As a native 'softmax' activation is interated to the warp-ctc library,
+         'linear' activation is expected instead in the 'input' layer.
+
+    The simple usage:
+
+    .. code-block:: python
+
+      ctc = warp_ctc_layer(input=input,
+                           label=label,
+                           size=1001,
+                           blank=1000,
+                           norm_by_times=False)
+
+    :param input: The input layer.
+    :type input: LayerOutput
+    :param label: The data layer of label with variable length.
+    :type label: LayerOutput
+    :param size: category numbers + 1.
+    :type size: int
+    :param name: The name of this layer, which can not specify.
+    :type name: basestring|None
+    :param blank: the 'blank' label used in ctc
+    :type blank: int
+    :param norm_by_times: Whether to normalization by times. False by default.
+    :type norm_by_times: bool
+    :param layer_attr: Extra Layer config.
+    :type layer_attr: ExtraLayerAttribute|None
+    :return: LayerOutput object.
+    :rtype: LayerOutput
+    """
+    assert isinstance(input, LayerOutput)
+    assert isinstance(label, LayerOutput)
+    if label.size is not None:
+        if size is not None:
+            assert size == label.size + 1
+        else:
+            size = label.size + 1
+    Layer(
+        name=name,
+        type=LayerType.WARP_CTC_LAYER,
+        size=size,
+        blank=blank,
+        norm_by_times=norm_by_times,
+        inputs=[input.name, label.name],
+        **ExtraLayerAttribute.to_kwargs(layer_attr))
+    return LayerOutput(
+        name, LayerType.WARP_CTC_LAYER, parents=[input, label], size=size)
 
 
 @wrap_name_default()
@@ -4392,7 +4531,7 @@ def cross_entropy(input, label, name=None, coeff=1.0, layer_attr=None):
 
     .. code-block:: python
 
-       cost = cross_entropy(input=input_layer, 
+       cost = cross_entropy(input=input_layer,
                             label=label_layer)
 
     :param input: The first input layer.
@@ -4432,7 +4571,7 @@ def cross_entropy_with_selfnorm(input,
 
     .. code-block:: python
 
-       cost = cross_entropy_with_selfnorm(input=input_layer, 
+       cost = cross_entropy_with_selfnorm(input=input_layer,
                                           label=label_layer)
 
     :param input: The first input layer.
@@ -4502,7 +4641,7 @@ def huber_cost(input, label, name=None, coeff=1.0, layer_attr=None):
 
     .. code-block:: python
 
-       cost = huber_cost(input=input_layer, 
+       cost = huber_cost(input=input_layer,
                          label=label_layer)
 
     :param input: The first input layer.
@@ -4542,7 +4681,7 @@ def multi_binary_label_cross_entropy(input,
 
     .. code-block:: python
 
-       cost = multi_binary_label_cross_entropy(input=input_layer, 
+       cost = multi_binary_label_cross_entropy(input=input_layer,
                                                label=label_layer)
 
     :param input: The first input layer.

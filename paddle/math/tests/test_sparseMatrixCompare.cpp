@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@ limitations under the License. */
 //  so disable when
 /// only cpu version.
 
-#include "paddle/utils/Util.h"
-#include "paddle/math/Matrix.h"
-#include "test_matrixUtil.h"
 #include <gtest/gtest.h>
+#include "paddle/math/Matrix.h"
+#include "paddle/utils/Util.h"
+#include "test_matrixUtil.h"
 
 using namespace paddle;  // NOLINT
 using namespace std;     // NOLINT
@@ -155,7 +155,7 @@ TEST(SMatrix, sMatrixMul) {
   for (auto M : {1, 40, 128, 200}) {
     for (auto N : {100, 2000, 20480}) {
       for (auto K : {100, 512, 1024}) {
-        VLOG(3) << " M=" << M << " N=" << N << " K=" << K;;
+        VLOG(3) << " M=" << M << " N=" << N << " K=" << K;
         testSpMatrixMul(M, N, K, 0.05);
       }
     }

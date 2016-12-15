@@ -1,4 +1,4 @@
-# Copyright (c) 2016 Baidu, Inc. All Rights Reserved
+# Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -138,7 +138,14 @@ def init_config_environment(
         g_root_submodel=None,
         g_submodel_map={},
         g_submodel_stack=[],
-        g_add_submodel_suffix=False, ):
+        g_add_submodel_suffix=False,
+
+        # Whether current layer needs to pass the image height and width.
+        # Default value is true, but if it encounters recurrent_layer_group,
+        # it will be false. The reason is that image is converted to be sequence,
+        # image height will be sequence length, and image width will be feature
+        # length of each timestep.
+        g_pass_height_width=True, ):
 
     for k, v in locals().iteritems():
         globals()[k] = copy.deepcopy(v)
@@ -410,8 +417,8 @@ def RecurrentLayerGroupEnd(name):
                   "RecurrentLayerGroup not begin")
     for pair in g_current_submodel.memories:  #check exist
         layer = g_layer_map[pair.layer_name]
-        config_assert(layer is not None, "memory declare wrong name:%s" %
-                      pair.layer_name)
+        config_assert(layer is not None,
+                      "memory declare wrong name:%s" % pair.layer_name)
         memory_link = g_layer_map[pair.link_name]
         config_assert(layer.size == memory_link.size,
                       "memory declare wrong size:%d" % memory_link.size)
@@ -593,6 +600,21 @@ class DotMulProjection(Projection):
         return [1, output_size]
 
 
+# ScalingProjection
+@config_class
+class ScalingProjection(Projection):
+    type = 'scaling'
+
+    def calc_output_size(self, input_layer_config):
+        return input_layer_config.size
+
+    def calc_parameter_size(self, input_size, output_size):
+        return 1
+
+    def calc_parameter_dims(self, input_size, output_size):
+        return [1, 1]
+
+
 @config_class
 class TableProjection(Projection):
     type = 'table'
@@ -671,9 +693,9 @@ class ConvProjection(Projection):
 
         parse_conv(conv_conf, input_layer_name, self.proj_conf.conv_conf,
                    num_filters)
-        # TODO: support rectangle input
-        self.proj_conf.output_size = (self.proj_conf.conv_conf.output_x**
-                                      2) * num_filters
+        self.proj_conf.output_size = self.proj_conf.conv_conf.output_x * \
+                                     self.proj_conf.conv_conf.output_y * \
+                                     num_filters
 
     def calc_output_size(self, input_layer_config):
         return self.proj_conf.output_size
@@ -683,7 +705,8 @@ class ConvProjection(Projection):
         ci = self.proj_conf.conv_conf.channels
         fh = self.proj_conf.conv_conf.filter_size
         fw = self.proj_conf.conv_conf.filter_size_y
-        return co * ci * fh * fw
+        gr = self.proj_conf.conv_conf.groups
+        return co * ci * fh * fw / gr
 
     def calc_bias_size(self):
         return self.proj_conf.num_filters
@@ -748,8 +771,9 @@ class ConvOperator(Operator):
         parse_conv(conv_conf,
                    MakeLayerNameInSubmodel(input_layer_names[0]),
                    self.operator_conf.conv_conf, num_filters)
-        self.operator_conf.output_size = (self.operator_conf.conv_conf.output_x
-                                          **2) * num_filters
+        self.operator_conf.output_size = self.operator_conf.conv_conf.output_x * \
+                                         self.operator_conf.conv_conf.output_y * \
+                                         num_filters
 
         config_assert(len(input_layer_names) == 2, "Conv is binary operator")
 
@@ -784,38 +808,35 @@ class Conv(Cfg):
             config_assert(output_x <= 0)
 
 
-# please refer to the comments in proto/ModelConfig.proto
 @config_class
 class BilinearInterp(Cfg):
-    def __init__(self, out_size_x=None, out_size_y=None, num_channels=None):
+    def __init__(self, out_size_x=None, out_size_y=None, channels=None):
         self.add_keys(locals())
 
 
-# please refer to the comments in proto/ModelConfig.proto
 @config_class
 class Pool(Cfg):
-    def __init__(self,
-                 pool_type,
-                 channels,
-                 size_x,
-                 size_y=None,
-                 img_width=None,
-                 start=None,
-                 stride=None,
-                 stride_y=None,
-                 padding=None,
-                 padding_y=None):
+    def __init__(
+            self,
+            pool_type,
+            channels,
+            size_x,
+            size_y=None,
+            img_width=None,
+            start=None,
+            stride=None,  # 1 by defalut in protobuf
+            stride_y=None,
+            padding=None,  # 0 by defalut in protobuf
+            padding_y=None):
         self.add_keys(locals())
 
 
-# please refer to the comments in proto/ModelConfig.proto
 @config_class
 class SpatialPyramidPool(Cfg):
-    def __init__(self, pool_type, pyramid_height, channels, img_width=None):
+    def __init__(self, pool_type, pyramid_height, channels):
         self.add_keys(locals())
 
 
-# please refer to the comments in proto/ModelConfig.proto
 @config_class
 class Norm(Cfg):
     def __init__(self,
@@ -830,7 +851,6 @@ class Norm(Cfg):
         self.add_keys(locals())
 
 
-# please refer to the comments in proto/ModelConfig.proto
 @config_class
 class Image(Cfg):
     def __init__(self, channels, img_size=None):
@@ -1037,18 +1057,8 @@ def TestData(data_config, async_load_data=None):
         g_config.test_data_config.async_load_data = async_load_data
 
 
-def parse_bilinear(bilinear, input_layer_name, bilinear_conf):
-    bilinear_conf.out_size_x = bilinear.out_size_x
-    bilinear_conf.out_size_y = bilinear.out_size_y
-    bilinear_conf.num_channels = bilinear.num_channels
-
-
-'''
-caffe_mode: compute the output size using floor instead of ceil,
-            which is consistent of caffe and CuDNN's convention.
-'''
-
-
+#caffe_mode: compute the output size using floor instead of ceil,
+#            which is consistent of caffe and CuDNN's convention.
 def cnn_output_size(img_size, filter_size, padding, stride, caffe_mode):
     output = (2 * padding + img_size - filter_size) / float(stride)
     if caffe_mode:
@@ -1057,18 +1067,32 @@ def cnn_output_size(img_size, filter_size, padding, stride, caffe_mode):
         return 1 + int(math.ceil(output))
 
 
-'''
-calcualte image_size based on output_size for convolution. 
-It is the reverse function of cnn_output_size
-'''
-
-
+#calcualte image_size based on output_size for de-convolution (ConvTransLayer).
+#It is the reverse function of cnn_output_size
 def cnn_image_size(output_size, filter_size, padding, stride, caffe_mode):
-    if caffe_mode:
-        img_size = (output_size - 1) * stride + filter_size - 2 * padding
-    else:
-        img_size = (output_size - 2) * stride + filter_size - 2 * padding + 1
+    img_size = (output_size - 1) * stride + filter_size - 2 * padding
+    if not caffe_mode:
+        img_size = img_size + 1
     return img_size
+
+
+def get_img_size(input_layer_name, channels):
+    input = g_layer_map[input_layer_name]
+    img_pixels = input.size / channels
+    img_size = input.width if input.width > 0 else int(img_pixels**0.5)
+    img_size_y = input.height if input.height > 0 else int(img_pixels /
+                                                           img_size)
+    config_assert(
+        img_size * img_size_y == img_pixels,
+        "Input layer %s: Incorrect input image size %d * %d for input image pixels %d"
+        % (input_layer_name, img_size, img_size_y, img_pixels))
+    return img_size, img_size_y
+
+
+def parse_bilinear(bilinear, input_layer_name, bilinear_conf):
+    parse_image(bilinear, input_layer_name, bilinear_conf.image_conf)
+    bilinear_conf.out_size_x = bilinear.out_size_x
+    bilinear_conf.out_size_y = bilinear.out_size_y
 
 
 def parse_pool(pool, input_layer_name, pool_conf):
@@ -1086,52 +1110,35 @@ def parse_pool(pool, input_layer_name, pool_conf):
     pool_conf.size_y = default(pool.size_y, pool_conf.size_x)
     pool_conf.stride_y = default(pool.stride_y, pool_conf.stride)
 
-    img_pixels = g_layer_map[input_layer_name].size / pool.channels
-    # the img_width may be removed,
-    # and it can be calculated automatically later.
-    pool_conf.img_size = default(pool.img_width, int(img_pixels**0.5))
-    pool_conf.img_size_y = img_pixels / pool_conf.img_size
-    config_assert(pool_conf.img_size * pool_conf.img_size_y == img_pixels,
-                  "Incorrect input image size %d for input image pixels %d" %
-                  (pool_conf.img_size, img_pixels))
+    pool_conf.img_size, pool_conf.img_size_y = \
+        get_img_size(input_layer_name, pool.channels)
 
     config_assert(not pool.start, "start is deprecated in pooling.")
 
     if pool.padding is not None:
         pool_conf.padding = pool.padding
-        pool_conf.padding_y = default(pool.padding_y, pool_conf.padding)
-        pool_conf.output_x = cnn_output_size(
-            pool_conf.img_size, pool_conf.size_x, pool_conf.padding,
-            pool_conf.stride, False)
-        pool_conf.output_y = cnn_output_size(
-            pool_conf.img_size_y, pool_conf.size_y, pool_conf.padding_y,
-            pool_conf.stride_y, False)
+    pool_conf.padding_y = default(pool.padding_y, pool_conf.padding)
+    pool_conf.output_x = cnn_output_size(pool_conf.img_size, pool_conf.size_x,
+                                         pool_conf.padding, pool_conf.stride,
+                                         False)
+    pool_conf.output_y = cnn_output_size(pool_conf.img_size_y, pool_conf.size_y,
+                                         pool_conf.padding_y,
+                                         pool_conf.stride_y, False)
 
 
 def parse_spp(spp, input_layer_name, spp_conf):
+    parse_image(spp, input_layer_name, spp_conf.image_conf)
     spp_conf.pool_type = spp.pool_type
     config_assert(spp.pool_type in ['max-projection', 'avg-projection'],
                   "pool-type %s is not in "
                   "['max-projection', 'avg-projection']" % spp.pool_type)
     spp_conf.pyramid_height = spp.pyramid_height
-    spp_conf.channels = spp.channels
-
-    img_pixels = g_layer_map[input_layer_name].size / spp_conf.channels
-
-    spp_conf.img_size = default(spp.img_width, int(img_pixels**0.5))
-    spp_conf.img_size_y = img_pixels / spp_conf.img_size
-    config_assert(spp_conf.img_size * spp_conf.img_size_y == img_pixels,
-                  "Incorrect input image size %d for input image pixels %d" %
-                  (spp_conf.img_size, img_pixels))
 
 
 def parse_image(image, input_layer_name, image_conf):
     image_conf.channels = image.channels
-    image_pixels = g_layer_map[input_layer_name].size / image_conf.channels
-    image_conf.img_size = int(image_pixels**0.5)
-    config_assert((image_conf.img_size**2) == image_pixels,
-                  "Incorrect input image size %d for input image pixels %d" %
-                  (image_conf.img_size, image_pixels))
+    image_conf.img_size, image_conf.img_size_y = \
+        get_img_size(input_layer_name, image_conf.channels)
 
 
 def parse_norm(norm, input_layer_name, norm_conf):
@@ -1145,24 +1152,18 @@ def parse_norm(norm, input_layer_name, norm_conf):
     norm_conf.pow = norm.pow
     norm_conf.blocked = norm.blocked
 
-    img_pixels = g_layer_map[input_layer_name].size / norm.channels
-    norm_conf.img_size = int(img_pixels**0.5)
-    config_assert((norm_conf.img_size**2) == img_pixels,
-                  "Incorrect input image size %d for input image pixels %d" %
-                  (norm_conf.img_size, img_pixels))
+    norm_conf.img_size, norm_conf.img_size_y = \
+        get_img_size(input_layer_name, norm.channels)
     norm_conf.output_x = norm_conf.img_size
+    norm_conf.output_y = norm_conf.img_size_y
     if norm.norm_type in ['cmrnorm-projection']:
         norm_conf.scale /= norm.size
     else:
         norm_conf.scale /= norm.size**2
 
 
-'''
-caffe_mode: compute the output size using floor instead of ceil,
-            which is consistent of caffe and CuDNN's convention.
-'''
-
-
+#caffe_mode: compute the output size using floor instead of ceil,
+#            which is consistent of caffe and CuDNN's convention.
 def parse_conv(conv, input_layer_name, conv_conf, num_filters, trans=False):
     conv_conf.filter_size = conv.filter_size
     conv_conf.filter_size_y = conv.filter_size_y
@@ -1176,33 +1177,24 @@ def parse_conv(conv, input_layer_name, conv_conf, num_filters, trans=False):
 
     if not trans:
         conv_conf.filter_channels = conv.channels / conv.groups
-
-        img_pixels = g_layer_map[input_layer_name].size / conv.channels
-        print('channels=%d size=%d' % (conv.channels,
-                                       g_layer_map[input_layer_name].size))
-        conv_conf.img_size = int(img_pixels**0.5)
-        config_assert((conv_conf.img_size**2) == img_pixels, (
-            "Input layer %s: Incorrect input image size %d for input " +
-            "image pixels %d") %
-                      (input_layer_name, conv_conf.img_size, img_pixels))
-
+        conv_conf.img_size, conv_conf.img_size_y = \
+            get_img_size(input_layer_name, conv.channels)
         conv_conf.output_x = cnn_output_size(
             conv_conf.img_size, conv_conf.filter_size, conv_conf.padding,
             conv_conf.stride, conv_conf.caffe_mode)
+        conv_conf.output_y = cnn_output_size(
+            conv_conf.img_size_y, conv_conf.filter_size_y, conv_conf.padding_y,
+            conv_conf.stride_y, conv_conf.caffe_mode)
     else:
         conv_conf.filter_channels = num_filters / conv.groups
-
-        outputSize = g_layer_map[input_layer_name].size / conv.channels
-        print('channels=%d size=%d' % (conv.channels,
-                                       g_layer_map[input_layer_name].size))
-        conv_conf.output_x = int(outputSize**0.5)
-        config_assert((conv_conf.output_x**2) == outputSize, (
-            "Input layer %s: Incorrect input image size %d for input " +
-            "image pixels %d") %
-                      (input_layer_name, conv_conf.output_x, outputSize))
+        conv_conf.output_x, conv_conf.output_y = \
+            get_img_size(input_layer_name, conv.channels)
         conv_conf.img_size = cnn_image_size(
             conv_conf.output_x, conv_conf.filter_size, conv_conf.padding,
             conv_conf.stride, conv_conf.caffe_mode)
+        conv_conf.img_size_y = cnn_image_size(
+            conv_conf.output_y, conv_conf.filter_size_y, conv_conf.padding_y,
+            conv_conf.stride_y, conv_conf.caffe_mode)
 
 
 def parse_block_expand(block_expand, input_layer_name, block_expand_conf):
@@ -1231,10 +1223,8 @@ def parse_block_expand(block_expand, input_layer_name, block_expand_conf):
 
 
 def parse_maxout(maxout, input_layer_name, maxout_conf):
-    maxout_conf.channels = maxout.channels
+    parse_image(maxout, input_layer_name, maxout_conf.image_conf)
     maxout_conf.groups = maxout.groups
-    maxout_conf.img_size_x = maxout.img_size_x
-    maxout_conf.img_size_y = maxout.img_size_y
 
 
 # Define an evaluator
@@ -1361,6 +1351,12 @@ class LayerBase(object):
 
         g_current_submodel.layer_names.append(self.config.name)
 
+        if self.config.type != 'data' and g_pass_height_width:
+            height = self.get_input_layer(0).height
+            width = self.get_input_layer(0).width
+            if height and width:
+                self.set_layer_height_width(height, width)
+
     def get_input_layer(self, input_index):
         return g_layer_map[self.config.inputs[input_index].input_layer_name]
 
@@ -1478,6 +1474,23 @@ class LayerBase(object):
                           'Different inputs result in' +
                           'different layer size at layer %s' % self.config.name)
 
+    def set_layer_height_width(self, height, width):
+        self.config.height = height
+        self.config.width = width
+
+    def set_cnn_layer(self,
+                      input_layer_name,
+                      height,
+                      width,
+                      channels,
+                      is_print=True):
+        size = height * width * channels
+        self.set_layer_size(size)
+        self.set_layer_height_width(height, width)
+        if is_print:
+            print("output for %s: c = %d, h = %d, w = %d, size = %d" %
+                  (input_layer_name, channels, height, width, size))
+
 
 @config_layer('multi_class_cross_entropy_with_selfnorm')
 class MultiClassCrossEntropySelfNormCostLayer(LayerBase):
@@ -1567,9 +1580,11 @@ class PrintLayer(LayerBase):
 
 @config_layer('data')
 class DataLayer(LayerBase):
-    def __init__(self, name, size, device=None):
+    def __init__(self, name, size, height=None, width=None, device=None):
         super(DataLayer, self).__init__(
             name, 'data', size, inputs=[], device=device)
+        if height and width:
+            self.set_layer_height_width(height, width)
 
 
 '''
@@ -1668,14 +1683,13 @@ class ConvLayerBase(LayerBase):
 
         for input_index in xrange(len(self.inputs)):
             input_layer = self.get_input_layer(input_index)
-            parse_conv(self.inputs[input_index].conv, input_layer.name,
-                       self.config.inputs[input_index].conv_conf, num_filters)
             conv_conf = self.config.inputs[input_index].conv_conf
+            parse_conv(self.inputs[input_index].conv, input_layer.name,
+                       conv_conf, num_filters)
             psize = self.calc_parameter_size(conv_conf)
-            print("output size for %s is %d " % (name, conv_conf.output_x))
             self.create_input_parameter(input_index, psize)
-            self.set_layer_size(
-                (conv_conf.output_x**2) * self.config.num_filters)
+            self.set_cnn_layer(name, conv_conf.output_y, conv_conf.output_x,
+                               self.config.num_filters)
 
         psize = self.config.size
         if shared_biases:
@@ -1762,10 +1776,11 @@ class NormLayer(LayerBase):
             name, 'norm', 0, inputs=inputs, device=device)
         for input_index in xrange(len(self.inputs)):
             input_layer = self.get_input_layer(input_index)
-            parse_norm(self.inputs[input_index].norm, input_layer.name,
-                       self.config.inputs[input_index].norm_conf)
             norm_conf = self.config.inputs[input_index].norm_conf
-            self.set_layer_size((norm_conf.output_x**2) * norm_conf.channels)
+            parse_norm(self.inputs[input_index].norm, input_layer.name,
+                       norm_conf)
+            self.set_cnn_layer(name, norm_conf.output_y, norm_conf.output_x,
+                               norm_conf.channels, False)
 
 
 @config_layer('pool')
@@ -1775,13 +1790,11 @@ class PoolLayer(LayerBase):
             name, 'pool', 0, inputs=inputs, device=device)
         for input_index in xrange(len(self.inputs)):
             input_layer = self.get_input_layer(input_index)
-            parse_pool(self.inputs[input_index].pool, input_layer.name,
-                       self.config.inputs[input_index].pool_conf)
             pool_conf = self.config.inputs[input_index].pool_conf
-            print("output size for %s is %d*%d " % (name, pool_conf.output_y,
-                                                    pool_conf.output_x))
-            self.set_layer_size(
-                (pool_conf.output_x * pool_conf.output_y) * pool_conf.channels)
+            parse_pool(self.inputs[input_index].pool, input_layer.name,
+                       pool_conf)
+            self.set_cnn_layer(name, pool_conf.output_y, pool_conf.output_x,
+                               pool_conf.channels)
 
 
 @config_layer('spp')
@@ -1791,12 +1804,10 @@ class SpatialPyramidPoolLayer(LayerBase):
             name, 'spp', 0, inputs=inputs, device=device)
         for input_index in xrange(len(self.inputs)):
             input_layer = self.get_input_layer(input_index)
-            parse_spp(self.inputs[input_index].spp, input_layer.name,
-                      self.config.inputs[input_index].spp_conf)
             spp_conf = self.config.inputs[input_index].spp_conf
-            output_size = (pow(4, spp_conf.pyramid_height) - 1) / (4 - 1)
-            print("output size for %s is %d " % (name, output_size))
-            self.set_layer_size(output_size * spp_conf.channels)
+            parse_spp(self.inputs[input_index].spp, input_layer.name, spp_conf)
+            output_x = (pow(4, spp_conf.pyramid_height) - 1) / (4 - 1)
+            self.set_cnn_layer(name, 1, output_x, spp_conf.image_conf.channels)
 
 
 @config_layer('batch_norm')
@@ -1858,10 +1869,10 @@ class BatchNormLayer(LayerBase):
             self.config.moving_average_fraction = moving_average_fraction
 
         input_layer = self.get_input_layer(0)
-        parse_image(self.inputs[0].image, input_layer.name,
-                    self.config.inputs[0].image_conf)
         image_conf = self.config.inputs[0].image_conf
-        self.set_layer_size((image_conf.img_size**2) * image_conf.channels)
+        parse_image(self.inputs[0].image, input_layer.name, image_conf)
+        self.set_cnn_layer(name, image_conf.img_size_y, image_conf.img_size,
+                           image_conf.channels, False)
 
         psize = self.calc_parameter_size(image_conf)
         dims = [1, psize]
@@ -1919,11 +1930,11 @@ class MaxOutLayer(LayerBase):
         super(MaxOutLayer, self).__init__(
             name, 'maxout', 0, inputs=inputs, **xargs)
         input_layer = self.get_input_layer(0)
-        parse_maxout(self.inputs[0].maxout, input_layer.name,
-                     self.config.inputs[0].maxout_conf)
         maxout_conf = self.config.inputs[0].maxout_conf
-        self.set_layer_size(g_layer_map[input_layer.name].size /
-                            maxout_conf.groups)
+        parse_maxout(self.inputs[0].maxout, input_layer.name, maxout_conf)
+        out_channels = maxout_conf.image_conf.channels / maxout_conf.groups
+        self.set_cnn_layer(name, g_layer_map[input_layer.name].height,
+                           g_layer_map[input_layer.name].width, out_channels)
 
 
 # key: cost type
@@ -2503,11 +2514,10 @@ class BilinearInterpLayer(LayerBase):
         super(BilinearInterpLayer, self).__init__(
             name, 'bilinear_interp', 0, inputs=inputs, **xargs)
         input_layer = self.get_input_layer(0)
-        parse_bilinear(self.inputs[0].bilinear_interp, input_layer.name,
-                       self.config.inputs[0].bilinear_interp_conf)
-        conf = self.inputs[0].bilinear_interp
-        self.set_layer_size(conf.out_size_x * conf.out_size_y *
-                            conf.num_channels)
+        conf = self.config.inputs[0].bilinear_interp_conf
+        parse_bilinear(self.inputs[0].bilinear_interp, input_layer.name, conf)
+        self.set_cnn_layer(name, conf.out_size_y, conf.out_size_x,
+                           conf.image_conf.channels)
 
 
 @config_layer('sum_to_one_norm')
@@ -2779,8 +2789,8 @@ class ConcatenateLayer2(LayerBase):
 @config_layer('recurrent')
 class RecurrentLayer(LayerBase):
     def __init__(self, name, inputs, reversed=False, bias=True, **xargs):
-        super(RecurrentLayer, self).__init__(name, 'recurrent', 0, inputs, **
-                                             xargs)
+        super(RecurrentLayer, self).__init__(name, 'recurrent', 0, inputs,
+                                             **xargs)
         config_assert(len(self.inputs) == 1, 'RecurrentLayer must have 1 input')
         input_layer = self.get_input_layer(0)
         size = input_layer.size
@@ -2862,22 +2872,22 @@ class MDLstmLayer(LayerBase):
                  active_state_type="sigmoid",
                  bias=True,
                  **xargs):
-        super(MDLstmLayer, self).__init__(name, 'mdlstmemory', 0, inputs, **
-                                          xargs)
+        super(MDLstmLayer, self).__init__(name, 'mdlstmemory', 0, inputs,
+                                          **xargs)
         config_assert(len(self.inputs) == 1, 'MDLstmLayer must have 1 input')
         input_layer = self.get_input_layer(0)
         dim_num = len(directions)
         #check input_layer.size is divided by (3+dim_num)
-        config_assert(input_layer.size %
-                      (3 + dim_num) == 0, "size % (dim_num) should be 0!")
+        config_assert(input_layer.size % (3 + dim_num) == 0,
+                      "size % (dim_num) should be 0!")
         size = input_layer.size / (3 + dim_num)
         self.set_layer_size(size)
         self.config.active_gate_type = active_gate_type
         self.config.active_state_type = active_state_type
         for i in xrange(len(directions)):
             self.config.directions.append(int(directions[i]))
-        self.create_input_parameter(0, size * size *
-                                    (3 + dim_num), [size, size, 3 + dim_num])
+        self.create_input_parameter(0, size * size * (3 + dim_num),
+                                    [size, size, 3 + dim_num])
         #bias includes 3 kinds of peephole, 3+dim_num+2+dim_num
         self.create_bias_parameter(bias, size * (5 + 2 * dim_num))
 
@@ -2915,8 +2925,8 @@ class GruStepLayer(LayerBase):
                  active_gate_type="sigmoid",
                  bias=True,
                  **xargs):
-        super(GruStepLayer, self).__init__(name, 'gru_step', size, inputs, **
-                                           xargs)
+        super(GruStepLayer, self).__init__(name, 'gru_step', size, inputs,
+                                           **xargs)
         config_assert(len(self.inputs) == 2, 'GruStepLayer must have 2 input')
         input_layer0 = self.get_input_layer(0)
         input_layer1 = self.get_input_layer(1)
@@ -2977,9 +2987,32 @@ class CTCLayer(LayerBase):
         config_assert(len(self.inputs) == 2, 'CTCLayer must have 2 inputs')
 
 
+@config_layer('warp_ctc')
+class WarpCTCLayer(LayerBase):
+    def __init__(self,
+                 name,
+                 size,
+                 inputs,
+                 blank=0,
+                 norm_by_times=False,
+                 device=None):
+        super(WarpCTCLayer, self).__init__(
+            name, 'warp_ctc', size=size, inputs=inputs, device=device)
+        self.config.blank = blank
+        self.config.norm_by_times = norm_by_times
+        config_assert(len(self.inputs) == 2, 'WarpCTCLayer must have 2 inputs')
+        input_layer = self.get_input_layer(0)
+        config_assert(
+            (input_layer.active_type == '' or
+             input_layer.active_type == 'linear'),
+            "Expecting the active_type of input layer to be linear or null")
+
+
 @config_layer('recurrent_layer_group')
 class RecurrentLayerGroup(LayerBase):
     def __init__(self, name, device=None):
+        global g_pass_height_width
+        g_pass_height_width = False
         super(RecurrentLayerGroup, self).__init__(
             name, 'recurrent_layer_group', 0, inputs=[], device=device)
 
@@ -3332,12 +3365,26 @@ def my_fatal(s):
     raise Exception()
 
 
+_parse_config_hooks = set()
+
+
+def register_parse_config_hook(f):
+    """
+    Register a hook function for parse_config. parse_config will invoke the hook
+    at the beginning of parse. This make it possible to reset global state for
+    for constructing the model.
+    """
+    _parse_config_hooks.add(f)
+
+
 def parse_config(config_file, config_arg_str):
     '''
     @param config_arg_str: a string of the form var1=val1,var2=val2. It will be
     passed to config script as a dictionary CONFIG_ARGS
     '''
     init_config_environment()
+    for hook in _parse_config_hooks:
+        hook()
 
     config_args = {}
 
@@ -3365,7 +3412,21 @@ def parse_config(config_file, config_arg_str):
     g_root_submodel.is_recurrent_layer_group = False
     g_current_submodel = g_root_submodel
 
-    execfile(config_file, make_config_environment(config_file, config_args))
+    # for paddle on spark, need support non-file config.
+    # you can use parse_config like below:
+    #
+    # from paddle.trainer.config_parser import parse_config
+    # def configs():
+    #    #your paddle config code, which is same as config file.
+    #
+    # config = parse_config(configs, "is_predict=1")
+    # # then you get config proto object.
+    if hasattr(config_file, '__call__'):
+        config_file.func_globals.update(
+            make_config_environment("", config_args))
+        config_file()
+    else:
+        execfile(config_file, make_config_environment(config_file, config_args))
     for k, v in settings.iteritems():
         if v is None:
             continue

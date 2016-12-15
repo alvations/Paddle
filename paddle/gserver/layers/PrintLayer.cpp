@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,7 @@ namespace paddle {
 
 class PrintLayer : public Layer {
 public:
-  explicit PrintLayer(const LayerConfig& config)
-      : Layer(config) {}
+  explicit PrintLayer(const LayerConfig& config) : Layer(config) {}
   void forward(PassType passType);
   void backward(const UpdateCallback& callback) {}
 };

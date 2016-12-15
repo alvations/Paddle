@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,9 +39,11 @@ namespace paddle {
 class Projection {
 public:
   static Projection* create(const ProjectionConfig& config,
-                            ParameterPtr parameter, bool useGpu);
+                            ParameterPtr parameter,
+                            bool useGpu);
 
-  Projection(const ProjectionConfig& config, ParameterPtr parameter,
+  Projection(const ProjectionConfig& config,
+             ParameterPtr parameter,
              bool useGpu)
       : config_(config), parameter_(parameter), useGpu_(useGpu) {}
 

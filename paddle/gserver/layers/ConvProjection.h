@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ public:
   /**
    * Constructor.
    */
-  ConvProjection(const ProjectionConfig& config, ParameterPtr parameter,
+  ConvProjection(const ProjectionConfig& config,
+                 ParameterPtr parameter,
                  bool useGpu);
 
   ~ConvProjection();
@@ -47,9 +48,15 @@ protected:
     imageW_ = in_->getFrameWidth();
     if (imageH_ == 0) imageH_ = configImgH_;
     if (imageW_ == 0) imageW_ = configImgW_;
-    outputH_ = outputSize(imageH_, filterH_, paddingH_, strideH_,
+    outputH_ = outputSize(imageH_,
+                          filterH_,
+                          paddingH_,
+                          strideH_,
                           /* caffeMode */ true);
-    outputW_ = outputSize(imageW_, filterW_, paddingW_, strideW_,
+    outputW_ = outputSize(imageW_,
+                          filterW_,
+                          paddingW_,
+                          strideW_,
                           /* caffeMode */ true);
 
     const_cast<Argument*>(out_)->setFrameHeight(outputH_);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,15 +12,14 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #include "Util.h"
 
 #include <dirent.h>
+#include <pmmintrin.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <xmmintrin.h>
-#include <pmmintrin.h>
 
 #include <fstream>
 #include <mutex>
@@ -29,10 +28,10 @@ limitations under the License. */
 
 #include "CommandLineParser.h"
 #include "CustomStackTrace.h"
+#include "StringUtil.h"
 #include "Thread.h"
 #include "ThreadLocal.h"
 #include "Version.h"
-#include "StringUtil.h"
 
 P_DEFINE_int32(seed, 1, "random number seed. 0 for srand(time)");
 
@@ -54,7 +53,8 @@ P_DEFINE_int32(seed, 1, "random number seed. 0 for srand(time)");
 #include <gperftools/profiler.h>
 
 P_DEFINE_int32(profile_signal, 12, "signal for switch google profiler");
-P_DEFINE_string(profile_data_file, "gperf.prof",
+P_DEFINE_string(profile_data_file,
+                "gperf.prof",
                 "file for storing profile data");
 
 static void profilerSwitch(int signalNumber) {
@@ -94,18 +94,18 @@ static void installProfilerSwitch() {}
 namespace paddle {
 
 pid_t getTID() {
-  #if defined(__APPLE__) || defined(__OSX__)
-      // syscall is deprecated: first deprecated in macOS 10.12.
-      // syscall is unsupported;
-      // syscall pid_t tid = syscall(SYS_thread_selfid);
-      uint64_t tid;
-      pthread_threadid_np(NULL, &tid);
-  #else
-      #ifndef __NR_gettid
-      #define __NR_gettid 224
-      #endif
-      pid_t tid = syscall(__NR_gettid);
-  #endif
+#if defined(__APPLE__) || defined(__OSX__)
+  // syscall is deprecated: first deprecated in macOS 10.12.
+  // syscall is unsupported;
+  // syscall pid_t tid = syscall(SYS_thread_selfid);
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+#else
+#ifndef __NR_gettid
+#define __NR_gettid 224
+#endif
+  pid_t tid = syscall(__NR_gettid);
+#endif
   CHECK_NE((int)tid, -1);
   return tid;
 }
@@ -129,7 +129,8 @@ void runInitFunctions() {
   std::call_once(g_onceFlag, []() {
     LOG(INFO) << "Calling runInitFunctions";
     if (g_initFuncs) {
-      std::sort(g_initFuncs->begin(), g_initFuncs->end(),
+      std::sort(g_initFuncs->begin(),
+                g_initFuncs->end(),
                 [](const PriorityFuncPair& x, const PriorityFuncPair& y) {
                   return x.first > y.first;
                 });
@@ -282,7 +283,7 @@ void mkDir(const char* filename) {
   }
 }
 
-void mkDirRecursively(const char *dir) {
+void mkDirRecursively(const char* dir) {
   struct stat sb;
 
   if (!stat(dir, &sb)) return;
@@ -302,7 +303,6 @@ void loadFileList(const std::string& fileListFileName,
     fileList.push_back(line);
   }
 }
-
 
 double getMemoryUsage() {
   FILE* fp = fopen("/proc/meminfo", "r");
@@ -363,7 +363,9 @@ size_t calculateServiceNum(const std::string& pservers, int ports_num) {
   return hosts.size() * ports_num;
 }
 
-void memcpyWithCheck(void* dest, const void* src, size_t num,
+void memcpyWithCheck(void* dest,
+                     const void* src,
+                     size_t num,
                      const void* srcEnd) {
   int minus = (char*)srcEnd - (char*)src - num;
   CHECK_LE(0, minus) << "memcpyWithCheck: copy " << num

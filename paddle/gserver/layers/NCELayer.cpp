@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ namespace paddle {
 /**
  * Noise-contrastive estimation.
  * Implements the method in the following paper:
- * A fast and simple algorithm for training neural probabilistic language models.
+ * A fast and simple algorithm for training neural probabilistic language
+ * models.
  *
  * The config file api is nce_layer.
  */
@@ -98,8 +99,8 @@ public:
 
     if (config_.neg_sampling_dist_size()) {
       CHECK_EQ(numClasses_, config_.neg_sampling_dist_size());
-      sampler_.reset(new MultinomialSampler(config_.neg_sampling_dist().data(),
-                                            numClasses_));
+      sampler_.reset(MultinomialSampler::create(
+          config_.neg_sampling_dist().data(), numClasses_));
     }
 
     return true;
@@ -180,8 +181,11 @@ public:
     int size = getSize();
     resetOutput(batchSize, size);
 
-    Matrix::resizeOrCreate(sampleOut_.value, 1, samples_.size(),
-                           /* trans= */ false, useGpu_);
+    Matrix::resizeOrCreate(sampleOut_.value,
+                           1,
+                           samples_.size(),
+                           /* trans= */ false,
+                           useGpu_);
 
     forwardBias();
 
@@ -195,8 +199,11 @@ public:
   }
 
   void backward(const UpdateCallback& callback) {
-    Matrix::resizeOrCreate(sampleOut_.grad, 1, samples_.size(),
-                           /* trans= */ false, useGpu_);
+    Matrix::resizeOrCreate(sampleOut_.grad,
+                           1,
+                           samples_.size(),
+                           /* trans= */ false,
+                           useGpu_);
 
     backwardCost();
 
@@ -241,7 +248,8 @@ public:
     real* sampleOut = sampleOut_.value->getData();
 
     for (size_t i = 0; i < samples_.size(); ++i) {
-      sampleOut[i] += dotProduct(dim, inputMat->getRowBuf(samples_[i].sampleId),
+      sampleOut[i] += dotProduct(dim,
+                                 inputMat->getRowBuf(samples_[i].sampleId),
                                  weightMat->getRowBuf(samples_[i].labelId));
     }
   }
@@ -257,7 +265,9 @@ public:
 
     if (weightGradMat) {
       for (size_t i = 0; i < samples_.size(); ++i) {
-        axpy(dim, sampleGrad[i], inputMat->getRowBuf(samples_[i].sampleId),
+        axpy(dim,
+             sampleGrad[i],
+             inputMat->getRowBuf(samples_[i].sampleId),
              weightGradMat->getRowBuf(samples_[i].labelId));
       }
       weights_[layerId]->incUpdate(callback);
@@ -265,7 +275,9 @@ public:
 
     if (inputGradMat) {
       for (size_t i = 0; i < samples_.size(); ++i) {
-        axpy(dim, sampleGrad[i], weightMat->getRowBuf(samples_[i].labelId),
+        axpy(dim,
+             sampleGrad[i],
+             weightMat->getRowBuf(samples_[i].labelId),
              inputGradMat->getRowBuf(samples_[i].sampleId));
       }
     }

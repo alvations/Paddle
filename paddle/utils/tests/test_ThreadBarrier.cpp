@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,49 +15,51 @@ limitations under the License. */
 #include <gtest/gtest.h>
 #include <set>
 #include <vector>
-#include "paddle/utils/Logging.h"
 #include "paddle/utils/CommandLineParser.h"
-#include "paddle/utils/Util.h"
 #include "paddle/utils/Locks.h"
+#include "paddle/utils/Logging.h"
+#include "paddle/utils/Util.h"
 
 P_DEFINE_int32(test_thread_num, 100, "testing thread number");
 
-void testNormalImpl(size_t thread_num,
-                    const std::function<void(size_t,
-                    std::mutex&, std::set<std::thread::id>&,
-                    paddle::ThreadBarrier&)>& callback) {
- std::mutex mutex;
- std::set<std::thread::id> tids;
- paddle::ThreadBarrier barrier(thread_num);
+void testNormalImpl(
+    size_t thread_num,
+    const std::function<void(size_t,
+                             std::mutex&,
+                             std::set<std::thread::id>&,
+                             paddle::ThreadBarrier&)>& callback) {
+  std::mutex mutex;
+  std::set<std::thread::id> tids;
+  paddle::ThreadBarrier barrier(thread_num);
 
- std::vector<std::thread> threads;
- threads.reserve(thread_num);
- for (size_t i = 0; i < thread_num; ++i) {
-    threads.emplace_back([&thread_num, &mutex,
-                         &tids, &barrier, &callback]{
-        callback(thread_num, mutex, tids, barrier);
+  std::vector<std::thread> threads;
+  threads.reserve(thread_num);
+  for (size_t i = 0; i < thread_num; ++i) {
+    threads.emplace_back([&thread_num, &mutex, &tids, &barrier, &callback] {
+      callback(thread_num, mutex, tids, barrier);
     });
- }
+  }
 
- for (auto& thread : threads) {
-   thread.join();
- }
+  for (auto& thread : threads) {
+    thread.join();
+  }
 }
 
 TEST(ThreadBarrier, normalTest) {
-  for (auto &thread_num : {10, 30, 50 , 100 , 300, 1000}) {
+  for (auto& thread_num : {10, 30, 50, 100, 300, 1000}) {
     testNormalImpl(thread_num,
-                  [](size_t thread_num, std::mutex& mutex,
-                  std::set<std::thread::id>& tids,
-                  paddle::ThreadBarrier& barrier){
-      {
-        std::lock_guard<std::mutex> guard(mutex);
-        tids.insert(std::this_thread::get_id());
-      }
-      barrier.wait();
-      // Check whether all threads reach this point or not
-      CHECK_EQ(tids.size(), thread_num);
-    });
+                   [](size_t thread_num,
+                      std::mutex& mutex,
+                      std::set<std::thread::id>& tids,
+                      paddle::ThreadBarrier& barrier) {
+                     {
+                       std::lock_guard<std::mutex> guard(mutex);
+                       tids.insert(std::this_thread::get_id());
+                     }
+                     barrier.wait();
+                     // Check whether all threads reach this point or not
+                     CHECK_EQ(tids.size(), thread_num);
+                   });
   }
 }
 

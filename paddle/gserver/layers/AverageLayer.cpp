@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,8 +75,8 @@ void AverageLayer::backward(const UpdateCallback& callback) {
         // empty sequence
         continue;
       }
-      dataMtx_->setData(gradientData + starts[sequenceId] * dim, sequenceLength,
-                        dim);
+      dataMtx_->setData(
+          gradientData + starts[sequenceId] * dim, sequenceLength, dim);
       outMtx_->setData(gradient + sequenceId * dim);
       switch (mode_) {
         case kAverage: {

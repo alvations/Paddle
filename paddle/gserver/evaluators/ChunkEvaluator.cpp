@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ public:
     numCorrect_ = 0;
   }
 
-  virtual void printStats(std::ostream& os) {
+  virtual void printStats(std::ostream& os) const {
     double precision = (double)numCorrect_ / numOutputSegments_;
     double recall = (double)numCorrect_ / numLabelSegments_;
     double f1 =
@@ -144,7 +144,8 @@ public:
     size_t numSequences = sequenceStartPositions->getSize() - 1;
     const int* starts = sequenceStartPositions->getData();
     for (size_t i = 0; i < numSequences; ++i) {
-      eval1(output->getData() + starts[i], label->getData() + starts[i],
+      eval1(output->getData() + starts[i],
+            label->getData() + starts[i],
             starts[i + 1] - starts[i]);
     }
     return 0;

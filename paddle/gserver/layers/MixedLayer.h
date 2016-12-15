@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,18 +12,17 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #pragma once
 
 #include "Layer.h"
-#include "Projection.h"
 #include "Operator.h"
+#include "Projection.h"
 
 namespace paddle {
 
 /**
- * A mixed layer has multiple input layers. 
- * Each input layer was processed by a Projection or Operator. 
+ * A mixed layer has multiple input layers.
+ * Each input layer was processed by a Projection or Operator.
  * The results of all projections or Operators are summed together with bias
  * (if configured), and then go through an activation function and dropout
  * (if configured).
@@ -43,7 +42,7 @@ public:
   virtual void backward(const UpdateCallback& callback = nullptr);
   virtual void resetState();
   /**
-   * setState() should be called after getState(). 
+   * setState() should be called after getState().
    * Argument state consists of all projections states.
    */
   virtual void setState(LayerStatePtr state);

@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -11,7 +11,6 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
-
 
 #include "CosSimLayer.h"
 #include "paddle/utils/Logging.h"
@@ -57,9 +56,12 @@ void CosSimLayer::backward(const UpdateCallback& callback) {
     REGISTER_TIMER_INFO("CosBpAtvTimer", getName().c_str());
     MatrixPtr outG = this->getOutputGrad();
 
-    outG->cosSimDerivative(*this->getOutputValue(), *getInputValue(0),
-                           *getInputValue(1), *getInputGrad(0),
-                           *getInputGrad(1), config_.cos_scale());
+    outG->cosSimDerivative(*this->getOutputValue(),
+                           *getInputValue(0),
+                           *getInputValue(1),
+                           *getInputGrad(0),
+                           *getInputGrad(1),
+                           config_.cos_scale());
   }
 }
 

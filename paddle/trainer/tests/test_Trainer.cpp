@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,9 @@ P_DECLARE_string(config);
 P_DECLARE_int32(gpu_id);
 P_DECLARE_bool(allow_only_one_model_on_one_gpu);
 
-void checkGradientTest(const string& configFile, bool useGpu, bool parallel,
+void checkGradientTest(const string& configFile,
+                       bool useGpu,
+                       bool parallel,
                        int trainerCount = 1) {
   FLAGS_use_gpu = useGpu;
   FLAGS_parallel_nn = parallel;
@@ -94,7 +96,7 @@ TEST(checkGradient, multi) {
 TEST(checkGradient, hsigmoid) { checkGradientTest(configFile2, false, false); }
 
 TEST(checkGradient, chunk) {
-#if defined(__APPLE__) || defined (__OSX__)
+#if defined(__APPLE__) || defined(__OSX__)
   EXPECT_EQ(0, system("python trainer/tests/gen_proto_data.py"));
 #else
   EXPECT_EQ(0, system("python2 trainer/tests/gen_proto_data.py"));

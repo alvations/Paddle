@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +45,10 @@ public:
     const Argument& input = getInput(0);
     size_t batchSize = input.getBatchSize();
     IVector::resizeOrCreate(output_.ids, batchSize * beamSize_, useGpu_);
-    Matrix::resizeOrCreate(output_.in, batchSize, beamSize_, false,
+    Matrix::resizeOrCreate(output_.in,
+                           batchSize,
+                           beamSize_,
+                           false,
                            /* useGpu */ useGpu_);
     output_.value = nullptr;
     input.value->rowMax(*output_.ids, *output_.in);

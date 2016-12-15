@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,13 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #pragma once
 
 #include <vector>
 #include "Layer.h"
-#include "paddle/math/Matrix.h"
 #include "NormLayer.h"
+#include "paddle/math/Matrix.h"
 
 namespace paddle {
 
@@ -44,13 +43,13 @@ public:
 
 /**
  * @brief response normalization within feature maps
- * namely normalize in independent channel 
- * When code refactoring, we delete the original implementation. 
+ * namely normalize in independent channel
+ * When code refactoring, we delete the original implementation.
  * Need to implement in the futrue.
  */
 class ResponseNormLayer : public NormLayer {
 protected:
-  size_t channels_, size_, outputX_, imgSize_;
+  size_t channels_, size_, outputX_, imgSize_, outputY_, imgSizeY_;
   float scale_, pow_;
   MatrixPtr denoms_;
 

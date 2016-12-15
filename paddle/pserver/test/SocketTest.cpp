@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 Baidu, Inc. All Rights Reserve.
+/* Copyright (c) 2016 PaddlePaddle Authors. All Rights Reserve.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -12,14 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-
 #include "paddle/utils/Util.h"
 
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #include <thread>
 
@@ -184,7 +183,8 @@ SocketClient::SocketClient(const std::string& serverAddr, int serverPort) {
 
   bzero((char*)&serv_addr, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
-  bcopy((char*)server->h_addr, (char*)&serv_addr.sin_addr.s_addr,
+  bcopy((char*)server->h_addr,
+        (char*)&serv_addr.sin_addr.s_addr,
         server->h_length);
   serv_addr.sin_port = htons(serverPort);
 
