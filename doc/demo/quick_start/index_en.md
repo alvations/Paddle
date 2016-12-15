@@ -1,4 +1,4 @@
-# Quick Start Tutorial
+# Quick Start
 
 This tutorial will teach the basics of deep learning (DL), including how to implement many different models in PaddlePaddle. You will learn how to:
   - Prepare data into the standardized format that PaddlePaddle accepts.
@@ -134,7 +134,7 @@ def process(settings, file_name):
 You need to add a data provider definition `define_py_data_sources2` in our network configuration. This definition specifies:
 
 - The path of the training and testing data (`data/train.list`, `data/test.list`).
-- The location of the data provider file (`dataprovider_pow`).
+- The location of the data provider file (`dataprovider_bow`).
 - The function to call to get data. (`process`).
 - Additional arguments or data. Here it passes the path of word dictionary.
 
@@ -164,7 +164,7 @@ You will describe four kinds of network architectures in this section.
 <center> ![](./PipelineNetwork_en.jpg) </center>
 
 First, you will build a logistic regression model. Later, you will also get chance to build other more powerful network architectures.
-For more detailed documentation, you could refer to: <a href = "../../ui/api/trainer_config_helpers/layers_index.html">Layer documentation</a>。All configuration files are in `demo/quick_start` directory.
+For more detailed documentation, you could refer to: <a href = "../../ui/api/trainer_config_helpers/layers.html">layer documentation</a>. All configuration files are in `demo/quick_start` directory.
 
 ### Logistic Regression
 The architecture is illustrated in the following picture:
@@ -477,7 +477,7 @@ The scripts of data downloading, network configurations, and training scrips are
 <td class="left">Word embedding</td>
 <td class="left"> 15MB </td>
 <td class="left"> 8.484%</td>
-<td class="left">trainer_config.bow.py</td>
+<td class="left">trainer_config.emb.py</td>
 </tr>
 
 <tr>
